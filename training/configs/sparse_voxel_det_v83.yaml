@@ -1,0 +1,155 @@
+# SparseVoxelDet Configuration — V83 (Native Resolution + Proper Recipe)
+# Architecture: SparseSEWResNet → SparseFPN → SparseDetHead → NMS
+# Key: Native 1280×720, 6ch features, WITH proper augmentation recipe.
+# Date: 2026-03-08
+#
+# V83 fixes vs V82-base (root cause analysis — see docs/reports/):
+#   1. RESTORED scale_range [0.8, 1.2] — v82-base had [1.0, 1.0] (NO aug!)
+#   2. RESTORED multi_scale_sizes — proportional rectangular multi-scale
+#   3. Extended epochs 20→50 — v80 peaked ep5/200, 20 was too short
+#   4. Stronger regularization: wd 0.01, ema 0.9997 (match v82-speed)
+#   5. Longer warmup 5000 steps for native-res stability
+#
+# Why v82 plateaued at ~80%:
+#   - v82-base REMOVED scale aug that v80 had → 6.7% gap vs v82-speed at ep1
+#   - Multi-scale training was disabled for rectangular inputs (code bug, fixed)
+#   - 20 epochs with cosine = LR too low by ep10, model underfitting
+#   - Weaker weight decay = insufficient regularization for 57K feat positions
+
+# ============================================================================
+# Model Architecture (IDENTICAL to v82)
+# ============================================================================
+model:
+  type: sparse_voxel_det
+  backbone: sparse_sew_resnet
+  backbone_size: nano_deep        # 4.8M params, SE attention on L3/L4
+  fpn_channels: 128               # SparseFPN output channels
+  num_classes: 1                  # Binary: drone vs background
+  in_channels: 6                  # 6ch temporal surface features
+  input_size: [720, 1280]         # H, W — NATIVE sensor resolution
+  head_convs: 2                   # MLP layers in detection head
+  prior_prob: 0.01                # Cls bias init for rare positive predictions
+  temporal_pool_mode: max         # max | mean — how to squeeze temporal dim
+
+# ============================================================================
+# Sparse Voxelization
+# ============================================================================
+sparse:
+  time_bins: 16                    # Power-of-2, ~2.08ms per bin in 33ms frame
+  voxel_size: [1, 1, 1000]
+  max_voxels: -1                   # UNCAPPED — let all voxels through
+  max_voxels_train: -1
+  max_voxels_eval: -1
+
+# ============================================================================
+# Detection Head Configuration
+# ============================================================================
+detection:
+  stride: 4                       # Output stride of fused feature map
+  center_sampling_radius: 1.5     # For target assignment
+  score_thresh: 0.05              # Inference score threshold
+  nms_thresh: 0.5                 # NMS IoU threshold
+  max_detections: 100             # Max detections per image
+
+# ============================================================================
+# Training Configuration — FIXED RECIPE
+# ============================================================================
+training:
+  epochs: 50                      # v82 had 20 (too short), v80 had 200
+  batch_size: 2
+  lr: 0.0003                      # Slightly higher LR — matches v82-speed
+  optimizer: AdamW
+  weight_decay: 0.01              # FIX: stronger regularization (was 0.005)
+  warmup_steps: 5000              # FIX: longer warmup for native res (was 3000)
+  warmup_epochs: 0
+  scheduler: cosine
+  grad_clip: 5.0
+  use_amp: true
+  amp_init_scale: 512.0
+  amp_growth_interval: 2000
+  amp_growth_factor: 2.0
+  amp_backoff_factor: 0.5
+  num_workers: 16                 # FIX: doubled from 8 (48 cores available)
+  checkpoint_interval_minutes: 30
+  cache_dataset: false
+  val_interval: 1                 # Validate every epoch
+  val_interval_after_epoch: 20
+  val_interval_after: 1
+  gradient_accumulation_steps: 4  # Effective batch size = 2 * 4 = 8
+  nan_grad_action: sanitize
+  grad_sanitize_clip: 25.0
+  per_loss_grad_diag_interval: 0
+  mem_cleanup_interval: 500
+  flush_partial_accumulation: false
+  max_samples_per_epoch: null
+  use_ema: true
+  ema_decay: 0.9997              # FIX: slightly faster EMA (was 0.9998)
+  close_mosaic_epoch: 40          # Disable mosaic for last 10 epochs
+
+# ============================================================================
+# Loss Configuration
+# ============================================================================
+loss:
+  focal_alpha: 0.25
+  focal_gamma: 2.0
+  cls_weight: 1.0
+  reg_weight: 2.0
+  ctr_weight: 1.0
+  iou_quality_weight: 0.0
+  uncertainty_weight: 0.0
+  ranking_weight: 0.0
+  proposal_weight: 0.0
+
+# ============================================================================
+# Data Configuration
+# ============================================================================
+data:
+  sparse_dir: data/datasets/fred_paper_parity_v82/sparse
+  label_dir: data/datasets/fred_paper_parity/labels
+  parity_enforced: false
+  sparse_contract:
+    enabled: true
+    allow_mixed_formats: false
+    files_per_seq: 3
+    expected_format: coords
+    expected_time_bins: 16
+    enforce_uniform_time_bins: true
+    enforce_per_seq_uniform_time_bins: true
+    require_coords_time_bins_metadata: false
+  sensor_size: [720, 1280]
+  train_split: canonical_train
+  val_split: canonical_test
+
+# ============================================================================
+# Augmentation — ALL AUGMENTATIONS RESTORED
+# ============================================================================
+augmentation:
+  horizontal_flip: 0.5
+  event_dropout: 0.02
+  temporal_flip: 0.0
+  polarity_flip: 0.3
+  scale_range: [0.8, 1.2]         # FIX: RESTORED (v82-base had [1.0, 1.0]!)
+  mosaic_prob: 0.0                 # Keep off — destructive for event temporal data
+  mixup_prob: 0.0
+  multi_scale_sizes: [576, 648, 720]  # FIX: proportional rect multi-scale (0.8x, 0.9x, 1.0x of H=720)
+
+# ============================================================================
+# Evaluation
+# ============================================================================
+eval:
+  score_thresh: 0.05
+  nms_thresh: 0.5
+  max_detections: 100
+  temporal_rerank:
+    enabled: false
+  audit_enabled: false
+
+# ============================================================================
+# Logging
+# ============================================================================
+logging:
+  log_interval: 10
+  save_interval: 5
+
+experiment:
+  name: sparse_voxel_det_v83

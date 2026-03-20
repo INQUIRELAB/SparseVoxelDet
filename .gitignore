@@ -1,0 +1,49 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+*.egg-info/
+dist/
+build/
+*.egg
+
+# Virtual environment
+venv/
+.venv/
+env/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.claude/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Data (large files)
+data/
+raw_data/
+
+# Training runs and checkpoints
+runs/
+*.pt
+*.pth
+
+# Logs
+*.log
+nohup.out
+
+# Jupyter
+.ipynb_checkpoints/
+
+# Misc
+*.zip
+*.tar.gz
+*.tar
+.env
+*.pdf

@@ -1,0 +1,148 @@
+# SparseVoxelDet Configuration — V83-640 (Resolution Ablation)
+# Architecture: SparseSEWResNet → SparseFPN → SparseDetHead → NMS
+# Key: Same v83 recipe (all fixes) but at 640×640 to isolate resolution impact.
+# Date: 2026-03-08
+#
+# Purpose: Compare directly against:
+#   - v80 (640×640, 2ch, scale aug, multi-scale) → 83.05% best
+#   - v83 (1280×720, 6ch, same recipe) → expected >83%
+#
+# This run answers: "Do 6ch features help when geometry is held fixed at 640×640?"
+
+# ============================================================================
+# Model Architecture (SAME as v83, but input_size is 640×640)
+# ============================================================================
+model:
+  type: sparse_voxel_det
+  backbone: sparse_sew_resnet
+  backbone_size: nano_deep
+  fpn_channels: 128
+  num_classes: 1
+  in_channels: 6                  # 6ch temporal surface features (same as v83)
+  input_size: [640, 640]          # ABLATION: v80-style square resolution
+  head_convs: 2
+  prior_prob: 0.01
+  temporal_pool_mode: max
+
+# ============================================================================
+# Sparse Voxelization
+# ============================================================================
+sparse:
+  time_bins: 16
+  voxel_size: [1, 1, 1000]
+  max_voxels: -1
+  max_voxels_train: -1
+  max_voxels_eval: -1
+
+# ============================================================================
+# Detection Head Configuration
+# ============================================================================
+detection:
+  stride: 4
+  center_sampling_radius: 1.5
+  score_thresh: 0.05
+  nms_thresh: 0.5
+  max_detections: 100
+
+# ============================================================================
+# Training Configuration — MATCHES v83 recipe
+# ============================================================================
+training:
+  epochs: 50
+  batch_size: 2
+  lr: 0.0003
+  optimizer: AdamW
+  weight_decay: 0.01
+  warmup_steps: 5000
+  warmup_epochs: 0
+  scheduler: cosine
+  grad_clip: 5.0
+  use_amp: true
+  amp_init_scale: 512.0
+  amp_growth_interval: 2000
+  amp_growth_factor: 2.0
+  amp_backoff_factor: 0.5
+  num_workers: 16
+  checkpoint_interval_minutes: 30
+  cache_dataset: false
+  val_interval: 1
+  val_interval_after_epoch: 20
+  val_interval_after: 1
+  gradient_accumulation_steps: 4  # Effective batch size = 2 * 4 = 8
+  nan_grad_action: sanitize
+  grad_sanitize_clip: 25.0
+  per_loss_grad_diag_interval: 0
+  mem_cleanup_interval: 500
+  flush_partial_accumulation: false
+  max_samples_per_epoch: null
+  use_ema: true
+  ema_decay: 0.9997
+  close_mosaic_epoch: 40
+
+# ============================================================================
+# Loss Configuration
+# ============================================================================
+loss:
+  focal_alpha: 0.25
+  focal_gamma: 2.0
+  cls_weight: 1.0
+  reg_weight: 2.0
+  ctr_weight: 1.0
+  iou_quality_weight: 0.0
+  uncertainty_weight: 0.0
+  ranking_weight: 0.0
+  proposal_weight: 0.0
+
+# ============================================================================
+# Data Configuration — uses 640×640 preprocessed data
+# ============================================================================
+data:
+  sparse_dir: data/datasets/fred_paper_parity_v82_640/sparse
+  label_dir: data/datasets/fred_paper_parity/labels
+  parity_enforced: false
+  sparse_contract:
+    enabled: true
+    allow_mixed_formats: false
+    files_per_seq: 3
+    expected_format: coords
+    expected_time_bins: 16
+    enforce_uniform_time_bins: true
+    enforce_per_seq_uniform_time_bins: true
+    require_coords_time_bins_metadata: false
+  sensor_size: [640, 640]
+  train_split: canonical_train
+  val_split: canonical_test
+
+# ============================================================================
+# Augmentation — MATCHES v83 recipe (square multi-scale like v80)
+# ============================================================================
+augmentation:
+  horizontal_flip: 0.5
+  event_dropout: 0.02
+  temporal_flip: 0.0
+  polarity_flip: 0.3
+  scale_range: [0.8, 1.2]
+  mosaic_prob: 0.0
+  mixup_prob: 0.0
+  multi_scale_sizes: [576, 608, 640]  # Square multi-scale (same as v80)
+
+# ============================================================================
+# Evaluation
+# ============================================================================
+eval:
+  score_thresh: 0.05
+  nms_thresh: 0.5
+  max_detections: 100
+  temporal_rerank:
+    enabled: false
+  audit_enabled: false
+
+# ============================================================================
+# Logging
+# ============================================================================
+logging:
+  log_interval: 10
+  save_interval: 5
+
+experiment:
+  name: sparse_voxel_det_v83_640
