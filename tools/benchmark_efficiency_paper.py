@@ -15,7 +15,7 @@ BOTH models benchmarked on the SAME GPU, same precision (FP16), same protocol.
 Usage:
     CUDA_VISIBLE_DEVICES=0 python tools/benchmark_efficiency_paper.py \
         --checkpoint runs/sparse_voxel_det/v83_640_seed42/best.pt \
-        --config V2/configs/sparse_voxel_det_v83_640.yaml \
+        --config <path/to/config.yaml> \
         --yolo-model yolo11n.pt \
         --num-warmup 100 --num-measure 1000
 """
@@ -40,7 +40,7 @@ os.chdir(str(project_root))
 
 
 # ============================================================================
-# Part 1: TRUE Sparse FLOP Counter via spconv Rulebook Interception
+# Part 1: Exact Sparse FLOP Counter via spconv Rulebook Interception
 # ============================================================================
 
 class SparseFlopsCounter:
@@ -51,7 +51,7 @@ class SparseFlopsCounter:
     The tensor `indice_num_per_loc[k]` gives the number of active pairs
     for kernel offset k. Summing this gives the total active pairs.
 
-    TRUE MACs per layer = total_active_pairs × C_in × C_out
+    Exact MACs per layer = total_active_pairs × C_in × C_out
     """
 
     def __init__(self):
@@ -715,7 +715,7 @@ def _stats(arr):
 
 
 # ============================================================================
-# Part 4: Alternative TRUE FLOP counting via spconv pair counting
+# Part 4: Alternative Exact FLOP counting via spconv pair counting
 # ============================================================================
 
 def count_true_sparse_macs(model, input_tensor):
@@ -727,8 +727,8 @@ def count_true_sparse_macs(model, input_tensor):
     with its pair count — correctly handling layers that reuse pairs via shared
     indice_key.
 
-    TRUE MACs per sparse conv = total_active_pairs × Cin × Cout
-    TRUE MACs per linear     = N × Cin × Cout
+    Exact MACs per sparse conv = total_active_pairs × Cin × Cout
+    Exact MACs per linear     = N × Cin × Cout
     """
     import spconv.pytorch as spconv
     import spconv.pytorch.ops as spconv_ops
@@ -879,7 +879,7 @@ def count_true_sparse_macs(model, input_tensor):
     unmeasured = 0
 
     print(f"\n{'='*140}")
-    print(f"TRUE SPARSE MAC COUNT (monkey-patched spconv pair generation)")
+    print(f"EXACT SPARSE MAC COUNT (monkey-patched spconv pair generation)")
     print(f"{'='*140}")
     print(f"{'Layer':<50} {'Type':<20} {'Ch':>10} {'K':>6} {'N_in':>8} "
           f"{'N_out':>8} {'Pairs':>10} {'MACs':>14} {'Nbrs':>6}")
@@ -1013,7 +1013,7 @@ def main():
     print(f"  Loaded {len(batches)} frames")
 
     # ----------------------------------------------------------------
-    # Step 2: TRUE FLOP counting
+    # Step 2: Exact FLOP counting
     # ----------------------------------------------------------------
     print(f"\n[3/5] Counting sparse MACs ({args.num_flop_frames} frames)...")
     flop_results = count_flops_multi_frame(model, batches, args.num_flop_frames)

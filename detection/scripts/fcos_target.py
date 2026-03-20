@@ -22,7 +22,7 @@ import math
 
 # Regress ranges per FPN level (min_size, max_size)
 # Objects outside this range are not assigned to this level
-# V2: Adjusted for backbone strides [4, 8, 16] with stem_stride=(1,2,2)
+# Adjusted for backbone strides [4, 8, 16] with stem_stride=(1,2,2)
 DEFAULT_REGRESS_RANGES = (
     (-1, 32),      # P3: small objects (stride 4, 74% FRED drones <32px)
     (32, 64),      # P4: medium objects (stride 8)

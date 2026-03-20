@@ -595,7 +595,7 @@ def test_sparse_backbone():
 
         # Create dummy sparse input
         batch_size = 4
-        spatial_shape = [15, 640, 640]  # T, H, W (V3 config)
+        spatial_shape = [15, 640, 640]  # T, H, W
         n_voxels = 10000
 
         indices = torch.zeros((n_voxels, 4), dtype=torch.int32, device=device)

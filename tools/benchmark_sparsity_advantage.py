@@ -2,7 +2,7 @@
 """
 Sparsity Advantage Benchmark for SparseVoxelDet.
 
-Measures metrics that demonstrate the TRUE advantage of sparse processing:
+Measures metrics that demonstrate the actual advantage of sparse processing:
 1. Active positions per frame (data efficiency)
 2. Resolution-independent latency (sparse cost ≈ constant)
 3. Memory scaling with resolution
@@ -16,7 +16,7 @@ for an efficiency comparison figure in the paper.
 Usage:
     CUDA_VISIBLE_DEVICES=0 python tools/benchmark_sparsity_advantage.py \
         --checkpoint runs/sparse_voxel_det/v83_seed42/latest.pt \
-        --config V2/configs/sparse_voxel_det_v83.yaml
+        --config <path/to/config.yaml>
 """
 import argparse
 import json

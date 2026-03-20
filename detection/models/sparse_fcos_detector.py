@@ -800,17 +800,17 @@ class SparseFCOSDetector(nn.Module):
             backbone_size: Backbone variant ('nano', 'small', 'medium', 'large')
             fpn_channels: Channels in FPN and head
             num_head_convs: Number of conv layers in FCOS head towers
-            strides: Feature map strides (V2: [4,8,16] with stem_stride=(1,2,2))
+            strides: Feature map strides ([4,8,16] with stem_stride=(1,2,2))
             regress_ranges: Size ranges for each FPN level
             center_sampling: Use center sampling for target assignment
             center_sampling_radius: Radius for center sampling
             prior_prob: Prior probability for focal loss bias init
-            norm_on_bbox: Normalize regression by stride (True for V2 strides)
+            norm_on_bbox: Normalize regression by stride (True for multi-stride)
             input_size: Input spatial size (H, W)
             num_temporal_groups: Number of temporal groups for bridge (3=early/mid/late)
             time_bins: Number of temporal bins
             stem_stride: Stride for backbone stem conv ((1,2,2) for 2x spatial downsample)
-            bridge_type: 'attention' (V3 learned temporal), 'group' (V2 fixed groups),
+            bridge_type: 'attention' (learned temporal), 'group' (fixed groups),
                 or 'motion_aware' (attention + gradient + variance with gated residuals)
             gn_groups: Number of groups for GroupNorm in FCOS head ConvBlocks (default 8).
                 With 128ch FPN: 8 groups = 16 channels/group (proper group statistics).
@@ -1139,13 +1139,13 @@ class SparseFCOSDetector(nn.Module):
 
 
 def test_sparse_fcos():
-    """Test the complete sparse FCOS detector (V3)."""
-    print("Testing SparseFCOSDetector V3 (TemporalAttentionBridge)...")
+    """Test the complete sparse FCOS detector."""
+    print("Testing SparseFCOSDetector (TemporalAttentionBridge)...")
 
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     print(f"Device: {device}")
 
-    # Create V3 model with attention bridge
+    # Create model with attention bridge
     model = SparseFCOSDetector(
         in_channels=2,
         num_classes=1,

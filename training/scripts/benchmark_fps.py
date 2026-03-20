@@ -6,9 +6,9 @@ Measures per-frame inference time (model forward + NMS), throughput (FPS),
 GPU memory usage, and percentile latencies (p50, p95, p99).
 
 Usage:
-    CUDA_VISIBLE_DEVICES=0 python V2/scripts/benchmark_fps.py \
-        --checkpoint runs/sparse_voxel_det/v83_640_seed42/best.pt \
-        --config V2/configs/sparse_voxel_det_v83_640.yaml \
+    CUDA_VISIBLE_DEVICES=0 python training/scripts/benchmark_fps.py \
+        --checkpoint <path/to/checkpoint.pt> \
+        --config <path/to/config.yaml> \
         --num-warmup 50 --num-measure 500
 """
 import argparse

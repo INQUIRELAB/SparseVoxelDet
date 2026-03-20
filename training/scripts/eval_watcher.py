@@ -10,7 +10,7 @@ For each new epoch checkpoint found:
   - When all runs finish training, runs FULL eval (all samples)
 
 Usage:
-    nohup python V2/scripts/eval_watcher.py > runs/sparse_voxel_det/eval_watcher.log 2>&1 &
+    nohup python training/scripts/eval_watcher.py > runs/sparse_voxel_det/eval_watcher.log 2>&1 &
 
 NOTE: You may need to adjust RUNS configuration below (GPU indices, run directories,
 batch sizes) to match your system. The default configuration expects v83 training runs.
@@ -60,7 +60,7 @@ RUNS = [
     },
 ]
 
-EVAL_SCRIPT = PROJECT_ROOT / "V2" / "scripts" / "evaluate_sparse_voxel_det.py"
+EVAL_SCRIPT = PROJECT_ROOT / "training" / "scripts" / "evaluate_sparse_voxel_det.py"
 PYTHON = sys.executable  # Use the current Python interpreter
 POLL_INTERVAL = 120          # Check every 2 minutes
 MONITOR_MAX_SAMPLES = 10000  # Fast eval for monitoring (~20 min)
