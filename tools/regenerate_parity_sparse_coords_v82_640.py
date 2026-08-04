@@ -1,16 +1,25 @@
 #!/usr/bin/env python3
 """
-Regenerate sparse data — 640x640 ablation (6ch features, downscaled from native).
+Regenerate parity sparse data — V82-640 ablation (6ch features, 640x640 downscale).
+
+Same as V82 EXCEPT:
+- Resolution downscaled from 1280x720 to 640x640 (like v80)
+- Keeps 6-channel features, T=16, hot pixel filtering
 
 Output per frame:
-- coords: [N, 3] int16 (t_bin, y, x) at 640x640
+- coords: [N, 3] int16 (t_bin, y, x) at 640x640 (downscaled from 1280x720)
 - feats:  [N, 6] float16 (log1p_on, log1p_off, recency_on, recency_off, std_on, std_off)
 - time_bins: int32 scalar metadata (=16)
 - n_events: int64 scalar (raw event count for this frame)
 
+NO /log(1+500) normalization.  NO dense intermediate.  Pure sparse.
+
 Usage:
-    python tools/regenerate_parity_sparse_coords_v82_640.py --dry-run
-    python tools/regenerate_parity_sparse_coords_v82_640.py --workers 24
+    # Dry run (count only):
+    ./venv/bin/python tools/regenerate_parity_sparse_coords.py --dry-run
+
+    # Real run with 24 workers:
+    ./venv/bin/python tools/regenerate_parity_sparse_coords.py --workers 24
 """
 from __future__ import annotations
 

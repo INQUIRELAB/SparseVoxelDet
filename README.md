@@ -1,147 +1,90 @@
 # SparseVoxelDet
 
-**No Dense Tensors Needed: Fully Sparse Object Detection on Event-Camera Voxel Grids**
+Code for "SparseVoxelDet: Fully Sparse Voxel Networks for Efficient Event-Based Drone Detection".
 
-## 👤 Authors
+Coordinate-sparse object detection on event-camera voxel grids. No stage of the pipeline, from backbone to detection head, constructs a dense spatial feature grid.
 
-**Mohamad Yazan Sadoun**, **Sarah Sharif**, **Yaser Mike Banad**
+Mohamad Yazan Sadoun, Sarah Sharif, Yaser Mike Banad. University of Oklahoma.
 
-University of Oklahoma, Norman, OK, USA
+## Results (FRED drone-detection benchmark)
 
-## 📄 Abstract
+Development protocol (147 training / 37 validation sequences, source-complete labels, single evaluator):
 
-Event cameras produce asynchronous, high-dynamic-range streams well suited for detecting small, fast-moving drones, yet most event-based detectors convert the sparse event stream into dense tensors, discarding the representational efficiency of neuromorphic sensing. We propose SparseVoxelDet, a fully sparse object detector in which backbone feature extraction, feature pyramid fusion, and the detection head all operate exclusively on occupied voxel positions through 3D sparse convolutions — no dense feature tensor is instantiated at any stage of the pipeline. On the FRED benchmark (629,832 annotated frames), SparseVoxelDet achieves 83.38% mAP@50 while processing only ~14,900 active voxels per frame (0.23% of the T×H×W grid), compared to 409,600 pixels for the dense YOLOv11 baseline (87.68% mAP@50). The sparse representation yields 858× GPU memory compression and 3,670× storage reduction relative to the equivalent dense 3D voxel tensor, with data-structure size that scales with scene dynamics rather than sensor resolution.
+| Model | AP50 | AP50:95 |
+|---|---|---|
+| SparseVoxelDet (seed 42) | 87.01 | 43.14 |
+| SparseVoxelDet (seed 123) | 86.38 | 42.26 |
+| YOLO11n, resolution-matched | 84.68 | 42.44 |
+| YOLO11n, letterboxed | 77.29 | 38.12 |
 
-## 📜 License
+Single sealed evaluation on FRED's canonical test partition, run once after every decision was frozen:
 
-This project is licensed under the **MIT License** — see [LICENSE](LICENSE) for details.
+| Model | AP50 |
+|---|---|
+| SparseVoxelDet (seed 42) | 84.33 |
+| SparseVoxelDet (seed 123) | 83.01 |
+| YOLO11n dense control | 79.37 |
 
----
+Efficiency: expansion-free fusion returns head occupancy from a median 78.88% to 10.53% and cuts fusion-stage work by 91.3%. Against numerically matched dense equivalents of its own operators, sparse execution is cheaper on all 5,000 profiled frames, by a median 27.5x in work and 4.65x in latency at batch 1.
 
-## 📊 Results
-
-| Method | Input | mAP@50 | mAP@50:95 | Active Positions |
-|--------|-------|--------|-----------|------------------|
-| YOLOv11 (dense baseline) | Event frames 640² | 87.68% | 49.25% | 409,600 |
-| **SparseVoxelDet (ours)** | **Sparse voxels 640²** | **83.38%** | **39.23%** | **~14,900** |
-
-- At IoU 0.40, SparseVoxelDet recovers to **89.26% mAP**, exceeding the YOLOv11 mAP@50 score
-- **91.9% recall** at IoU ≥ 0.50 — 71% of failures are localization near-misses, not missed targets
-- **858× GPU memory compression** and **3,670× storage reduction** over dense equivalents
-
-## 🏗️ Architecture
+## Layout
 
 ```
-Raw Events → Sparse Voxel Grid → SparseSEResNet → SparseFPN → SparseDetHead → NMS
-              (coord/feat pairs)   (backbone)       (neck)      (FCOS head)
-              zero dense tensors   3D sparse conv   sparse only  MLP on active pos
+V2/models/            SparseVoxelDet architecture (sparse_voxel_det_ic.py) and its base
+models/snn/           sparse SEW-ResNet backbone
+sparse_fcos_v1/       dataset loader, evaluator (metrics.py), EMA, event mosaic
+training/             released training entry point, trainer, both objectives, preflight, tests
+configs/              frozen training configuration; dense-control launch records
+tools/                voxel construction, support profiler, error forensics, contract validators
+docs/REPRODUCIBILITY.md   pinned-source digests, label provenance, dense-control recipe
 ```
 
-All operations use [spconv](https://github.com/traveller59/spconv) (Spatially Sparse Convolution Library). No dense tensor is allocated at any point in the pipeline.
+## Installation
 
-## ⚙️ Installation
-
-```bash
-git clone https://github.com/yazansadoun/SparseVoxelDet.git
-cd SparseVoxelDet
-
-python -m venv venv
-source venv/bin/activate
-
-pip install torch torchvision --index-url https://download.pytorch.org/whl/cu124
-pip install spconv-cu120  # or spconv-cu118 for CUDA 11.8
+```
+pip install torch --index-url https://download.pytorch.org/whl/cu128
+pip install spconv-cu126==2.3.8 spikingjelly==0.0.0.0.14
 pip install -r requirements.txt
 ```
 
-### Requirements
+Python 3.12, CUDA-capable GPU. Versions used for all reported numbers are listed in docs/REPRODUCIBILITY.md.
 
-- Python ≥ 3.10
-- PyTorch ≥ 2.0
-- spconv (CUDA-compatible version)
-- CUDA-capable GPU with ≥ 16 GB VRAM
+## Data
 
-## 📁 Dataset
-
-We evaluate on the [FRED (Florence RGB-Event Drone)](https://github.com/EVENT-CAMERA-FRED) benchmark:
-
-- 629,832 annotated event frames across 231 sequences
-- Prophesee EVK4 (IMX636) at 1280×720
-- 5 drone models, diverse lighting (daylight to complete darkness)
-
-### Preprocessing
-
-Convert raw event streams into sparse voxel grids:
-
-```bash
-# Native resolution (1280×720, 6 channels, T=16)
-python tools/regenerate_parity_sparse_coords_v82.py \
-    --input data/processed/FRED/ \
-    --output data/datasets/fred_paper_parity_v82/sparse/ \
-    --time-bins 16
-
-# 640×640 resolution
-python tools/regenerate_parity_sparse_coords_v82_640.py \
-    --input data/processed/FRED/ \
-    --output data/datasets/fred_paper_parity_v82_640/sparse/ \
-    --time-bins 16
-```
-
-Each output `.npz` file contains:
-- `coords`: `(M, 3)` int32 — `[t, y, x]` coordinates of active voxels
-- `feats`: `(M, 6)` float16 — temporal surface features per voxel
-- Typical `M ≈ 14,900` at 640² (0.23% occupancy)
-
-## 🚀 Training
-
-```bash
-CUDA_VISIBLE_DEVICES=0 python training/scripts/train_sparse_voxel_det_v82.py \
-    --config training/configs/sparse_voxel_det_v83_640.yaml
-```
-
-| Parameter | Value |
-|-----------|-------|
-| Epochs | 50 |
-| Optimizer | AdamW (lr=3e-4, wd=1e-2) |
-| Schedule | Cosine with 5,000-step warmup |
-| Batch size | 2 (single GPU) |
-| Precision | FP16 (AMP) |
-| EMA decay | 0.9997 |
-
-## 📈 Evaluation
-
-```bash
-CUDA_VISIBLE_DEVICES=0 python training/scripts/evaluate_sparse_voxel_det.py \
-    --checkpoint runs/best.pt
-```
-
-## 🗂️ Project Structure
+Download FRED (Prophesee EVK4, 1280x720, five drone models) from its authors' release, then build sparse voxel grids and labels:
 
 ```
-├── training/                     # Main training and evaluation pipeline
-│   ├── models/                  # SparseVoxelDet architecture
-│   ├── scripts/                 # Training, evaluation, benchmarking
-│   ├── configs/                 # YAML configurations
-│   ├── analysis/                # Prediction dumping, side-by-side rendering
-│   └── tests/                   # Smoke tests
-├── detection/                   # Shared detection infrastructure
-│   ├── models/                  # FCOS head, sparse detectors
-│   └── scripts/                 # Dataset loader, metrics, EMA, loss
-├── backbone/                    # SparseSEResNet backbone
-└── tools/                       # Preprocessing and benchmarking utilities
+python tools/regenerate_parity_sparse_coords_v82_640.py --help
+python tools/build_fred_official_parity_multibox.py --help
 ```
 
-## 📖 Citation
+Each frame becomes a coordinate array (M, 3) of [t, y, x] active voxels with (M, 6) features; median input occupancy is 0.0652%.
 
-```bibtex
-@article{sadoun2026sparsevoxeldet,
-  title={No Dense Tensors Needed: Fully Sparse Object Detection on Event-Camera Voxel Grids},
-  author={Sadoun, Mohamad Yazan and Sharif, Sarah and Banad, Yaser Mike},
-  year={2026}
-}
+## Training
+
+```
+python training/train_ic_quality.py --config configs/ic_quality_ddp3_e20.yaml
 ```
 
-## 🙏 Acknowledgements
+The released run used 3-GPU distributed data parallelism, global batch 6, 20 epochs, seed 42; the preflight in training/preflight_quality.py verifies source hashes and label manifests before launch.
 
-- [FRED Dataset](https://github.com/EVENT-CAMERA-FRED) — Florence RGB-Event Drone detection benchmark
-- [spconv](https://github.com/traveller59/spconv) — 3D sparse convolution primitives
-- [spikingjelly](https://github.com/fangwei123456/spikingjelly) — Spiking neural network framework
+## Evaluation
+
+```
+python sparse_fcos_v1/scripts/evaluate_sparse_fcos.py --help
+```
+
+The evaluator (sparse_fcos_v1/scripts/metrics.py, SHA-256 23c86324) scored every number in the paper, both arms, both splits.
+
+## Profiling and forensics
+
+```
+python tools/instrument_active_positions.py        # stage-wise active-position counts
+python tools/profiler/run_equivalence_gate.py      # dense-equivalence gate (must pass before profiling)
+python tools/profiler/profile_worker.py            # paired sparse/dense cost measurement
+python tools/run_error_forensics.py                # false-negative attribution
+```
+
+## License and citation
+
+MIT License. If you use this code, cite: M. Y. Sadoun, S. Sharif, Y. M. Banad, "SparseVoxelDet: Fully Sparse Voxel Networks for Efficient Event-Based Drone Detection," 2026.

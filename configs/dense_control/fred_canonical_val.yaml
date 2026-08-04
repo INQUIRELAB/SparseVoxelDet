@@ -1,0 +1,6 @@
+# FRED canonical-train 147/37 sequence carve-out; generated view audited by prepare_dense_control.py.
+path: /home/yazan/Projects/Fred_Project/Paper1_SparseVoxelDet/tools/sol_forensics/dense_control/dataset
+train: train_images.txt
+val: val_images.txt
+names:
+  0: drone

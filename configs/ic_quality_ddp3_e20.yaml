@@ -1,0 +1,155 @@
+model:
+  type: sparse_voxel_det_ic
+  backbone: sparse_sew_resnet
+  backbone_size: nano_deep
+  fpn_channels: 128
+  num_classes: 1
+  in_channels: 6
+  input_size: [640, 640]
+  head_convs: 2
+  prior_prob: 0.01
+  temporal_pool_mode: max
+
+sparse:
+  time_bins: 16
+  voxel_size: [1, 1, 1000]
+  max_voxels: -1
+  max_voxels_train: -1
+  max_voxels_eval: -1
+
+detection:
+  stride: 4
+  center_sampling_radius: 1.5
+  score_thresh: 0.05
+  nms_thresh: 0.5
+  max_detections: 100
+
+training:
+  epochs: 20
+  batch_size: 2
+  lr: 0.0003
+  optimizer: AdamW
+  weight_decay: 0.01
+  warmup_steps: 5000
+  warmup_epochs: 0
+  scheduler: cosine
+  grad_clip: 5.0
+  use_amp: true
+  amp_init_scale: 512.0
+  amp_growth_interval: 2000
+  amp_growth_factor: 2.0
+  amp_backoff_factor: 0.5
+  num_workers: 4
+  checkpoint_interval_minutes: 30
+  cache_dataset: false
+  val_interval: 1
+  val_interval_after_epoch: 20
+  val_interval_after: 1
+  gradient_accumulation_steps: 1
+  nan_grad_action: skip
+  grad_sanitize_clip: 25.0
+  per_loss_grad_diag_interval: 0
+  mem_cleanup_interval: 500
+  flush_partial_accumulation: false
+  max_samples_per_epoch: null
+  use_ema: true
+  ema_decay: 0.9997
+  close_mosaic_epoch: null
+
+loss:
+  focal_alpha: 0.25
+  focal_gamma: 2.0
+  cls_weight: 1.0
+  reg_weight: 2.0
+  ctr_weight: 1.0
+  iou_quality_weight: 0.0
+  uncertainty_weight: 0.0
+  ranking_weight: 0.0
+  proposal_weight: 0.0
+  use_qfl: false
+  nwd_weight: 0.5
+  nwd_c: 12.8
+  task_aligned_enabled: true
+  task_aligned_alpha: 1.0
+  task_aligned_beta: 6.0
+  dynamic_k_topq: 10
+  quality_bootstrap_epochs: 2
+
+data:
+  sparse_dir: data/datasets/fred_paper_parity_v82_640/sparse
+  label_dir: data/datasets/fred_paper_parity/labels_rawcomplete
+  parity_enforced: false
+  sparse_contract:
+    enabled: true
+    allow_mixed_formats: false
+    files_per_seq: 3
+    expected_format: coords
+    expected_time_bins: 16
+    enforce_uniform_time_bins: true
+    enforce_per_seq_uniform_time_bins: true
+    require_coords_time_bins_metadata: false
+  sensor_size: [640, 640]
+  train_split: canonical_val_train
+  val_split: canonical_val
+
+augmentation:
+  horizontal_flip: 0.5
+  event_dropout: 0.02
+  temporal_flip: 0.0
+  polarity_flip: 0.3
+  scale_range: [0.8, 1.2]
+  mosaic_prob: 0.0
+  mixup_prob: 0.0
+  multi_scale_sizes: [576, 608, 640]
+
+eval:
+  score_thresh: 0.05
+  nms_thresh: 0.5
+  max_detections: 100
+  temporal_rerank:
+    enabled: false
+  audit_enabled: false
+
+logging:
+  log_interval: 10
+  save_interval: 1
+
+ddp:
+  runtime_policy_version: ic-quality-ddp3-seed42-v2
+  world_size: 3
+  local_world_size: 3
+  per_rank_batch_size: 2
+  workers_per_rank: 4
+  gradient_accumulation_steps: 1
+  global_effective_batch_size: 6
+  train_roster_samples: 406701
+  sampler_samples_per_epoch: 406701
+  optimized_samples_per_epoch: 406698
+  optimizer_steps_per_epoch: 67783
+  warmup_optimizer_steps: 5000
+  total_optimizer_steps: 1355660
+  sampler:
+    seed: 42
+    shuffle: true
+    drop_last: true
+  validation:
+    owner_rank: 0
+    sharded: false
+    roster_samples: 103672
+  ordered_physical_uuids:
+    - GPU-1d11b997-90a9-ece7-9ce6-44ad85346817
+    - GPU-2a7554bd-5a91-25ab-3338-e2308ecb2a27
+    - GPU-48d3a2b0-fc78-8bc8-fdce-5a246fdc4989
+  forbidden_physical_uuids:
+    - GPU-b279b278-d3e7-eb16-73d2-f6f4b002276c
+  selected_power_limit_watts: 400
+  aggregate_power_limit_watts_exclusive: 2000
+
+experiment:
+  name: ic_quality_aligned_ddp3_seed42_e20
+  stage_b_contract:
+    sparse_se: per_sample_scatter_mean_fp32_accum
+    nwd_weight: 0.5
+    nwd_c: 12.8
+    checkpoint_selection: highest_AP50_then_AP50_95_then_earlier_epoch
+    corrected_label_manifest_sha256: 6a973831e215c733e77f4ba2553ae0e138a20cf01f1c5e30387292f52b2c56ee
